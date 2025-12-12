@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧箱嘜 v12.0 (條碼/QR Code版)</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    
+    <style>
+        /* =========================================
+           🖨️ 列印核心 (Print Core)
+           ========================================= */
+        @media print {
+            @page { margin: 0; size: A4; }
+            
+            html, body, #app, main {
+                background-color: white !important;
+                height: auto !important; width: 100% !important;
+                margin: 0 !important; padding: 0 !important;
+                overflow: visible !important; display: block !important;
+            }
+            .no-print, aside, .footer-signature { display: none !important; }
+            .preview-area { background: white !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+
+            .print-page { 
+                width: 210mm; height: 296mm; padding: 10mm !important; margin: 0 !important;
+                page-break-after: always; break-after: page;
+                display: grid; gap: 4mm; 
+                background: white !important; box-shadow: none !important; border: none !important;
+                position: relative !important; left: 0 !important; top: 0 !important;
+            }
+            .print-page:last-child { page-break-after: auto; break-after: auto; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .border-black { border-color: #000 !important; }
+        }
+
+        /* 螢幕樣式 */
+        .preview-area { background-color: #525659; min-height: 100vh; }
+        .print-page {
+            background: white; width: 210mm; min-height: 297mm;
+            padding: 10mm; margin: 0 auto 30px auto; 
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            display: grid; gap: 4mm;
+        }
+
+        .ship-mark-card { 
+            border: 2px solid #000; display: flex; flex-direction: column; 
+            height: 100%; background: white; overflow: hidden;
+        }
+        .mark-row { display: flex; width: 100%; position: relative; }
+        .mark-cell { 
+            padding: 4px; display: flex; word-break: break-word; min-height: 28px;
+            border-style: solid; border-width: 0; border-color: #000;
+            line-height: 1.2; position: relative; 
+        }
+
+        .selected-cell { outline: 2px dashed #f43f5e; z-index: 10; }
+        .selected-primary { outline: 2px solid #3b82f6; z-index: 20; }
+
+        .footer-signature {
+            position: fixed; bottom: 5px; left: 50%; transform: translateX(-50%);
+            font-size: 10px; color: #9ca3af; pointer-events: none; z-index: 50;
+            font-family: sans-serif; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        input[type="color"] { -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; overflow: hidden; border-radius: 4px; cursor: pointer; }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex text-gray-800">
+
+    <div id="app" class="flex flex-1 h-full font-sans">
+        
+        <div v-if="notification.show" class="fixed top-4 right-4 z-50 px-6 py-3 rounded shadow-lg text-white transition-opacity duration-300 no-print" :class="notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'" style="z-index: 100;">
+            {{ notification.message }}
+        </div>
+
+        <aside class="w-[450px] bg-white shadow-2xl flex flex-col z-20 no-print border-r h-full overflow-hidden">
+            <div class="p-3 border-b bg-gray-50 flex justify-between items-center shrink-0">
+                <div>
+                    <h1 class="text-lg font-bold text-blue-700 flex gap-2 items-center">
+                        <i data-lucide="scan-barcode"></i> 智慧箱嘜 v12.0
+                    </h1>
+                    <p class="text-xs text-gray-500">條碼 • QR Code • 列印修復</p>
+                </div>
+                <div class="flex gap-1">
+                    <button @click="exportLayout" class="flex flex-col items-center p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition" title="匯出設定"><i data-lucide="save" class="w-4 h-4"></i><span class="text-[10px]">匯出</span></button>
+                    <label class="flex flex-col items-center p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition cursor-pointer" title="匯入設定"><input type="file" accept=".json" @change="importLayout" class="hidden"><i data-lucide="folder-open" class="w-4 h-4"></i><span class="text-[10px]">匯入</span></label>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-5">
+                <section>
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">1. 版面分配</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-[10px] text-gray-400">橫向 (Cols)</label><select v-model.number="layout.cols" class="border p-2 rounded text-sm w-full"><option v-for="n in 88" :key="'c'+n" :value="n">{{ n }}</option></select></div>
+                        <div><label class="text-[10px] text-gray-400">縱向 (Rows)</label><select v-model.number="layout.rows" class="border p-2 rounded text-sm w-full"><option v-for="n in 88" :key="'r'+n" :value="n">{{ n }}</option></select></div>
+                    </div>
+                    <div class="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded flex items-center gap-2">
+                        <i data-lucide="file-stack" class="w-4 h-4"></i>
+                        <span v-if="importData.length > 0">共 {{ importData.length }} 筆，列印 <strong>{{ paginatedData.length }}</strong> 頁</span>
+                        <span v-else>設計模式 (預覽 1 頁)</span>
+                    </div>
+                </section>
+                <hr>
+
+                <section>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">2. 結構 (Ctrl 多選)</h3>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1 mb-2">
+                        <button @click="resetRows" class="text-xs border border-red-200 text-red-500 hover:bg-red-50 px-2 py-1 rounded">重置</button>
+                        <button @click="unmergeCells" class="text-xs border bg-white hover:bg-gray-100 px-2 py-1 rounded flex items-center justify-center gap-1" title="解除合併"><i data-lucide="split" class="w-3 h-3"></i> 解除</button>
+                        <button @click="mergeSelectedCells" class="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 shadow-sm flex items-center justify-center gap-1 col-span-2" :disabled="selectedCells.length < 2" :class="{'opacity-50 cursor-not-allowed': selectedCells.length < 2}"><i data-lucide="combine" class="w-3 h-3"></i> 合併選取</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1 mb-2">
+                        <button @click="deleteColumn" class="text-xs border border-red-200 text-red-600 hover:bg-red-50 px-2 py-1 rounded">刪除所在欄</button>
+                        <button @click="deleteRow" class="text-xs border border-red-200 text-red-600 hover:bg-red-50 px-2 py-1 rounded">刪除所在列</button>
+                    </div>
+                    <div class="border-2 border-gray-300 rounded p-1 bg-gray-100 space-y-1 select-none max-h-60 overflow-y-auto">
+                        <div v-for="(row, rIdx) in template.rows" :key="rIdx" class="flex gap-1 group relative">
+                            <div v-for="(cell, cIdx) in row.cells" :key="cIdx" 
+                                 @click="handleCellClick(rIdx, cIdx, $event)"
+                                 class="h-8 border border-gray-400 bg-white text-[10px] flex items-center justify-center cursor-pointer hover:bg-blue-50 transition relative overflow-hidden"
+                                 :class="{ 'selected-primary': isPrimarySelected(rIdx, cIdx), 'selected-cell': isMultiSelected(rIdx, cIdx) }"
+                                 :style="{ flexGrow: cell.colSpan || 1, flexBasis: 0 }">
+                                <span v-if="cell.type === 'diamond'" class="text-yellow-600">◆</span>
+                                <span v-else-if="cell.type === 'barcode'" class="text-gray-800"><i data-lucide="barcode" class="w-3 h-3"></i></span>
+                                <span v-else-if="cell.type === 'qrcode'" class="text-gray-800"><i data-lucide="qr-code" class="w-3 h-3"></i></span>
+                                <span v-else-if="cell.type === 'static'" class="text-blue-600">T</span>
+                                <span v-else class="text-green-600">V</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-1 mt-2">
+                            <button @click="addColumnGlobally" class="flex-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 py-1 rounded hover:bg-indigo-100">+ 欄</button>
+                            <button @click="addRow" class="flex-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 py-1 rounded hover:bg-blue-100">+ 列</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="primaryCell" class="bg-blue-50 p-3 rounded-lg border border-blue-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-800 mb-2 flex justify-between items-center">
+                        <span class="flex gap-2"><i data-lucide="edit-2" class="w-4 h-4"></i> 編輯內容</span>
+                    </h3>
+
+                    <div class="grid grid-cols-5 rounded bg-white border border-blue-200 overflow-hidden mb-2">
+                        <button @click="primaryCell.type = 'static'" :class="primaryCell.type === 'static' ? 'bg-blue-600 text-white' : 'text-gray-600'" class="py-1 text-xs border-r" title="文字">TXT</button>
+                        <button @click="primaryCell.type = 'variable'" :class="primaryCell.type === 'variable' ? 'bg-green-600 text-white' : 'text-gray-600'" class="py-1 text-xs border-r" title="變數 (CSV)">VAR</button>
+                        <button @click="primaryCell.type = 'barcode'" :class="primaryCell.type === 'barcode' ? 'bg-gray-800 text-white' : 'text-gray-600'" class="py-1 text-xs border-r" title="條碼"><i data-lucide="barcode" class="w-3 h-3 mx-auto"></i></button>
+                        <button @click="primaryCell.type = 'qrcode'" :class="primaryCell.type === 'qrcode' ? 'bg-gray-800 text-white' : 'text-gray-600'" class="py-1 text-xs border-r" title="QR Code"><i data-lucide="qr-code" class="w-3 h-3 mx-auto"></i></button>
+                        <button @click="primaryCell.type = 'diamond'" :class="primaryCell.type === 'diamond' ? 'bg-yellow-500 text-white' : 'text-gray-600'" class="py-1 text-xs" title="菱形">◆</button>
+                    </div>
+
+                    <div class="mb-2">
+                        <div v-if="primaryCell.type === 'static' || primaryCell.type === 'diamond'">
+                            <input v-model="primaryCell.value" class="w-full border p-1.5 rounded text-sm" :placeholder="primaryCell.type === 'diamond' ? '菱形文字' : '輸入固定文字'">
+                        </div>
+                        <div v-else-if="primaryCell.type === 'variable'">
+                            <input v-model="primaryCell.key" class="w-full border border-green-300 bg-green-50 p-1.5 rounded text-sm font-mono uppercase" placeholder="CSV 欄位 (如: PO)" @input="e => primaryCell.key = e.target.value.toUpperCase()">
+                        </div>
+                        <div v-else-if="primaryCell.type === 'barcode' || primaryCell.type === 'qrcode'">
+                            <div class="flex items-center gap-2 mb-1">
+                                <label class="flex items-center text-xs text-gray-700 cursor-pointer">
+                                    <input type="checkbox" v-model="primaryCell.isVariable" class="mr-1"> 使用 CSV 數據?
+                                </label>
+                            </div>
+                            <input v-if="!primaryCell.isVariable" v-model="primaryCell.value" class="w-full border p-1.5 rounded text-sm" placeholder="輸入固定條碼內容">
+                            <input v-else v-model="primaryCell.key" class="w-full border border-green-300 bg-green-50 p-1.5 rounded text-sm font-mono uppercase" placeholder="CSV 欄位 (如: PO_NO)" @input="e => primaryCell.key = e.target.value.toUpperCase()">
+                            
+                            <div v-if="primaryCell.type === 'barcode'" class="mt-2 text-xs flex gap-2">
+                                <label class="flex items-center"><input type="checkbox" v-model="primaryCell.showValue" class="mr-1"> 顯示數字</label>
+                                <select v-model="primaryCell.format" class="border rounded p-0.5 text-xs">
+                                    <option value="CODE128">Code 128</option>
+                                    <option value="EAN13">EAN 13</option>
+                                    <option value="UPC">UPC</option>
+                                    <option value="ITF14">ITF 14</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mb-2 bg-white p-2 rounded border">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] font-bold text-gray-500">前景色</label>
+                            <input type="color" v-model="primaryCell.color" class="w-6 h-6 p-0 border-0 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] font-bold text-gray-500">背景色</label>
+                            <input type="color" v-model="primaryCell.bgColor" class="w-6 h-6 p-0 border-0 rounded cursor-pointer">
+                        </div>
+                    </div>
+
+                    <div v-if="primaryCell.type === 'diamond'" class="mb-2 bg-yellow-50 p-2 rounded border border-yellow-200">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2"><span class="text-[10px] w-6">寬</span><input type="range" v-model.number="primaryCell.diamondW" min="20" max="1000" class="flex-1 h-1 bg-yellow-200 rounded-lg"></div>
+                            <div class="flex items-center gap-2"><span class="text-[10px] w-6">高</span><input type="range" v-model.number="primaryCell.diamondH" min="20" max="1000" class="flex-1 h-1 bg-yellow-200 rounded-lg"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <div class="bg-white rounded border p-1 flex justify-between">
+                            <button @click="primaryCell.alignH = 'left'" :class="primaryCell.alignH === 'left' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-left" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignH = 'center'" :class="primaryCell.alignH === 'center' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-center" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignH = 'right'" :class="primaryCell.alignH === 'right' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-right" class="w-3 h-3"></i></button>
+                        </div>
+                        <div class="bg-white rounded border p-1 flex justify-between">
+                            <button @click="primaryCell.alignV = 'top'" :class="primaryCell.alignV === 'top' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-vertical-justify-start" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignV = 'middle'" :class="primaryCell.alignV === 'middle' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-vertical-justify-center" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignV = 'bottom'" :class="primaryCell.alignV === 'bottom' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-vertical-justify-end" class="w-3 h-3"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-1 mb-2 items-center flex-wrap" v-if="primaryCell.type !== 'barcode' && primaryCell.type !== 'qrcode'">
+                        <select v-model.number="primaryCell.fontSize" class="border p-1 rounded text-xs w-16 bg-white"><option v-for="size in [10,12,14,16,18,20,24,32,48,64,72,96]" :value="size">{{ size }}px</option></select>
+                        <button @click="primaryCell.isBold = !primaryCell.isBold" :class="primaryCell.isBold ? 'bg-gray-300' : 'bg-white'" class="border p-1 rounded w-6 h-6 flex items-center justify-center font-bold text-xs">B</button>
+                        <button @click="primaryCell.isItalic = !primaryCell.isItalic" :class="primaryCell.isItalic ? 'bg-gray-300' : 'bg-white'" class="border p-1 rounded w-6 h-6 flex items-center justify-center italic text-xs">I</button>
+                        <button @click="primaryCell.isUnderline = !primaryCell.isUnderline" :class="primaryCell.isUnderline ? 'bg-gray-300' : 'bg-white'" class="border p-1 rounded w-6 h-6 flex items-center justify-center underline text-xs">U</button>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded border justify-items-center w-24 mx-auto">
+                        <div class="col-start-2"><input type="checkbox" v-model="primaryCell.borders.top" title="上邊框"></div>
+                        <div class="col-start-1 row-start-2"><input type="checkbox" v-model="primaryCell.borders.left" title="左邊框"></div>
+                        <div class="col-start-2 row-start-2 w-3 h-3 bg-gray-100 border flex items-center justify-center text-[8px] text-gray-400">線</div>
+                        <div class="col-start-3 row-start-2"><input type="checkbox" v-model="primaryCell.borders.right" title="右邊框"></div>
+                        <div class="col-start-2 row-start-3"><input type="checkbox" v-model="primaryCell.borders.bottom" title="下邊框"></div>
+                    </div>
+                </section>
+                <div v-else class="text-center text-gray-400 py-6 bg-gray-50 rounded border border-dashed"><p class="text-xs">請點選上方格子以編輯</p></div>
+                <hr>
+
+                <section class="grid grid-cols-2 gap-2">
+                    <button @click="downloadTemplateCSV" class="bg-indigo-50 text-indigo-700 border border-indigo-200 py-2 rounded text-sm flex justify-center items-center gap-1 hover:bg-indigo-100"><i data-lucide="download" class="w-4 h-4"></i> 下載模版</button>
+                    <div class="relative bg-green-50 text-green-700 border border-green-200 py-2 rounded text-sm flex justify-center items-center gap-1 hover:bg-green-100 cursor-pointer"><input type="file" accept=".csv" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer"><i data-lucide="upload" class="w-4 h-4"></i> 上載裝箱單</div>
+                </section>
+                <button v-if="importData.length" @click="importData = []" class="text-xs text-red-500 w-full text-center">清除數據</button>
+            </div>
+
+            <div class="p-4 border-t bg-gray-100">
+                <button @click="print" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded shadow flex justify-center gap-2"><i data-lucide="printer"></i> 列印 / PDF</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto preview-area p-8 print-area">
+            <div v-if="!importData.length" class="no-print mb-4 flex justify-center"><div class="bg-yellow-500 text-white px-4 py-1 rounded-full text-sm shadow animate-pulse">設計模式 (顯示預設值)</div></div>
+
+            <div v-for="(pageItems, pIdx) in paginatedData" :key="pIdx" class="print-page" :style="gridStyle">
+                <div v-for="(item, iIdx) in pageItems" :key="iIdx" class="ship-mark-card" :class="{'opacity-0 border-0': item.isPlaceholder && false}">
+                    <div class="flex-1 flex flex-col w-full">
+                        <div v-for="(row, rIdx) in template.rows" :key="rIdx" class="mark-row">
+                            <div v-for="(cell, cIdx) in row.cells" :key="cIdx" class="mark-cell bg-force"
+                                 :class="{ 'selected-primary': !isPrinting && !item.isPlaceholder && isPrimarySelected(rIdx, cIdx), 'selected-cell': !isPrinting && !item.isPlaceholder && isMultiSelected(rIdx, cIdx), 'font-bold': cell.isBold, 'italic': cell.isItalic, 'underline': cell.isUnderline, 'border-t': cell.borders.top, 'border-b': cell.borders.bottom, 'border-l': cell.borders.left, 'border-r': cell.borders.right }"
+                                 :style="{ color: cell.color, backgroundColor: cell.bgColor, borderColor: cell.color !== '#000000' && cell.color !== '#ffffff' ? cell.color : '', flexGrow: cell.colSpan || 1, flexBasis: 0, justifyContent: cell.alignH === 'left' ? 'flex-start' : (cell.alignH === 'right' ? 'flex-end' : 'center'), alignItems: cell.alignV === 'top' ? 'flex-start' : (cell.alignV === 'bottom' ? 'flex-end' : 'center'), textAlign: cell.alignH, fontSize: (cell.fontSize || 12) + 'px' }">
+                                
+                                <div v-if="cell.type === 'diamond' && !item.isPlaceholder" class="flex items-center justify-center relative" :style="{ width: (cell.diamondW || 70) + 'px', height: (cell.diamondH || 70) + 'px' }">
+                                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" class="absolute inset-0"><polygon points="50,0 100,50 50,100 0,50" fill="none" :stroke="cell.color" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+                                    <div class="relative z-10 text-center leading-tight break-words px-1" :style="{ color: cell.color }">{{ cell.value || '' }}</div>
+                                </div>
+
+                                <barcode-item v-else-if="cell.type === 'barcode' && !item.isPlaceholder" :text="getCellData(cell, item)" :format="cell.format || 'CODE128'" :show-value="cell.showValue !== false" :color="cell.color"></barcode-item>
+
+                                <qrcode-item v-else-if="cell.type === 'qrcode' && !item.isPlaceholder" :text="getCellData(cell, item)" :color="cell.color"></qrcode-item>
+
+                                <span v-else-if="cell.type === 'static'">{{ cell.value }}</span>
+                                <span v-else class="whitespace-pre-wrap">{{ !item.isPlaceholder && importData.length > 0 ? (item[cell.key] || '') : (item.isPlaceholder ? '' : `[${cell.key}]`) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <div class="footer-signature no-print">豐狂出品 • 智慧箱嘜</div>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
+
+        // --- 條碼元件 ---
+        const BarcodeItem = {
+            props: ['text', 'format', 'showValue', 'color'],
+            template: `<svg ref="svgRef" class="w-full h-full max-h-full max-w-full"></svg>`,
+            setup(props) {
+                const svgRef = ref(null);
+                const render = () => {
+                    if (svgRef.value && props.text) {
+                        try {
+                            JsBarcode(svgRef.value, props.text, {
+                                format: props.format, displayValue: props.showValue, lineColor: props.color || '#000',
+                                margin: 0, height: 40, width: 2, fontSize: 12
+                            });
+                        } catch (e) { console.warn('Barcode error', e); }
+                    }
+                };
+                watch(() => [props.text, props.format, props.showValue, props.color], () => nextTick(render));
+                onMounted(render);
+                return { svgRef };
+            }
+        };
+
+        // --- QR Code元件 ---
+        const QrcodeItem = {
+            props: ['text', 'color'],
+            template: `<img :src="src" class="object-contain" style="max-height: 100%; max-width: 100%;">`,
+            setup(props) {
+                const src = ref('');
+                const render = async () => {
+                    if (props.text) {
+                        try {
+                            src.value = await QRCode.toDataURL(props.text, { 
+                                margin: 0, color: { dark: props.color || '#000', light: '#0000' } 
+                            });
+                        } catch (e) { console.warn('QR error', e); }
+                    }
+                };
+                watch(() => [props.text, props.color], () => nextTick(render));
+                onMounted(render);
+                return { src };
+            }
+        };
+
+        createApp({
+            components: { BarcodeItem, QrcodeItem },
+            setup() {
+                const layout = reactive({ rows: 2, cols: 2 });
+                const importData = ref([]);
+                const isPrinting = ref(false);
+                const notification = reactive({ show: false, message: '', type: 'info' });
+                const primarySelection = reactive({ row: -1, col: -1 });
+                const selectedCells = ref([]); 
+
+                const template = reactive({
+                    rows: [
+                        { cells: [{ type: 'static', value: 'SHIPPING MARK', key: '', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 2, fontSize: 20, alignH: 'center', alignV: 'middle', borders: { top: false, bottom: false, left: false, right: false } }] },
+                        { cells: [{ type: 'diamond', value: '豐狂出品', key: '', isBold: false, bgColor: '#ffffff', color: '#000000', diamondW: 100, diamondH: 100, colSpan: 2, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: false, bottom: false, left: false, right: false } }] },
+                        { cells: [{ type: 'static', value: 'PO NO.:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'PO', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] },
+                        { cells: [{ type: 'static', value: 'STYLE NO.:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'STYLE', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] },
+                        { cells: [{ type: 'static', value: 'COLOR:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'COLOR', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] },
+                        { cells: [{ type: 'static', value: 'QTY:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'QTY', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] },
+                        { cells: [{ type: 'static', value: 'C/NO:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'C/NO', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] },
+                        { cells: [{ type: 'static', value: 'MADE IN HONG KONG', key: '', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 2, fontSize: 14, alignH: 'center', alignV: 'bottom', borders: { top: false, bottom: false, left: false, right: false } }] }
+                    ]
+                });
+
+                const showNotification = (msg, type = 'success') => { notification.message = msg; notification.type = type; notification.show = true; setTimeout(() => notification.show = false, 3000); };
+                const handleCellClick = (r, c, event) => {
+                    if (event.ctrlKey || event.metaKey) {
+                        const existsIdx = selectedCells.value.findIndex(item => item.r === r && item.c === c);
+                        if (existsIdx >= 0) selectedCells.value.splice(existsIdx, 1); else selectedCells.value.push({ r, c });
+                    } else { primarySelection.row = r; primarySelection.col = c; selectedCells.value = [{ r, c }]; }
+                };
+                const isPrimarySelected = (r, c) => primarySelection.row === r && primarySelection.col === c;
+                const isMultiSelected = (r, c) => selectedCells.value.some(item => item.r === r && item.c === c);
+                const primaryCell = computed(() => primarySelection.row === -1 ? null : template.rows[primarySelection.row]?.cells[primarySelection.col]);
+
+                const createCell = () => ({ type: 'static', value: 'New', key: '', isBold: false, bgColor: '#ffffff', color: '#000000', diamondW: 70, diamondH: 70, colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true }, format: 'CODE128', showValue: true, isVariable: false });
+                const addRow = () => { const last = template.rows[template.rows.length - 1]; const count = last ? last.cells.length : 2; template.rows.push({ cells: Array(count).fill(0).map(() => createCell()) }); };
+                const addColumnGlobally = () => { template.rows.forEach(row => row.cells.push(createCell())); showNotification('已新增一欄'); };
+                const resetRows = () => { if(confirm('重置表格？')) template.rows = [ { cells: [createCell(), createCell()] } ]; };
+                
+                const mergeSelectedCells = () => {
+                    if (selectedCells.value.length < 2) return;
+                    const cells = [...selectedCells.value].sort((a, b) => (a.r - b.r) || (a.c - b.c));
+                    const isHorizontal = cells.every(c => c.r === cells[0].r);
+                    const isVertical = cells.every(c => c.c === cells[0].c);
+                    if (isHorizontal) {
+                        for(let i=0; i<cells.length-1; i++) if(cells[i+1].c !== cells[i].c + 1) return showNotification('橫向合併須相鄰', 'error');
+                        const target = template.rows[cells[0].r].cells[cells[0].c];
+                        let totalSpan = 0; for(let i=1; i<cells.length; i++) totalSpan += (template.rows[cells[0].r].cells[cells[i].c].colSpan || 1);
+                        target.colSpan = (target.colSpan || 1) + totalSpan;
+                        for(let i=cells.length-1; i>0; i--) template.rows[cells[0].r].cells.splice(cells[i].c, 1);
+                        showNotification('橫向合併成功'); selectedCells.value = []; primarySelection.row = -1;
+                    } else if (isVertical) {
+                        for(let i=0; i<cells.length-1; i++) if(cells[i+1].r !== cells[i].r + 1) return showNotification('縱向合併須相鄰', 'error');
+                        for(let i=0; i<cells.length; i++) {
+                            const c = template.rows[cells[i].r].cells[cells[i].c];
+                            if (i < cells.length - 1) c.borders.bottom = false;
+                            if (i > 0) { c.borders.top = false; c.type = 'static'; c.value = ''; }
+                        }
+                        showNotification('縱向合併成功'); selectedCells.value = [];
+                    }
+                };
+                const unmergeCells = () => {
+                    if (primarySelection.row === -1) return;
+                    const c = template.rows[primarySelection.row].cells[primarySelection.col];
+                    if (c.colSpan > 1) { const cnt = c.colSpan; c.colSpan = 1; for(let i=0; i<cnt-1; i++) template.rows[primarySelection.row].cells.splice(primarySelection.col+1, 0, createCell()); }
+                    c.borders.top = true; c.borders.bottom = true; showNotification('已解除合併');
+                };
+                const deleteRow = () => { if (primarySelection.row !== -1) template.rows.splice(primarySelection.row, 1); primarySelection.row = -1; selectedCells.value = []; };
+                const deleteColumn = () => { if (primarySelection.col !== -1) { template.rows.forEach(row => row.cells.splice(primarySelection.col, 1)); primarySelection.col = -1; selectedCells.value = []; } };
+
+                const exportLayout = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ layout, template })], { type: 'application/json' })); a.download = `ShipMark_Template.json`; a.click(); };
+                const importLayout = (e) => { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = (evt) => { const d = JSON.parse(evt.target.result); if(d.layout) Object.assign(layout, d.layout); if(d.template) Object.assign(template, d.template); }; r.readAsText(f); e.target.value = ''; };
+                const downloadTemplateCSV = () => { 
+                    const keys = new Set(); template.rows.forEach(r => r.cells.forEach(c => { if ((c.type === 'variable' || (c.isVariable && (c.type === 'barcode' || c.type === 'qrcode'))) && c.key) keys.add(c.key); }));
+                    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\uFEFF" + Papa.unparse([Array.from(keys)], { quotes: true })], { type: 'text/csv;charset=utf-8;' })); a.download = `PackingList.csv`; a.click();
+                };
+                const handleImport = (e) => { const f = e.target.files[0]; if (!f) return; Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => { importData.value = res.data; e.target.value = ''; showNotification(`成功載入 ${res.data.length} 筆`); } }); };
+
+                const getCellData = (cell, item) => {
+                    if (cell.isVariable && importData.value.length > 0 && !item.isPlaceholder) return item[cell.key] || '';
+                    if (cell.isVariable && item.isPlaceholder) return 'PREVIEW';
+                    return cell.value || '12345678';
+                };
+
+                const paginatedData = computed(() => {
+                    const s = layout.rows * layout.cols;
+                    if (importData.value.length === 0) return [new Array(s).fill({ isPlaceholder: true })];
+                    const p = []; for (let i = 0; i < importData.value.length; i += s) { const c = importData.value.slice(i, i + s); while(c.length < s) c.push({ isPlaceholder: true }); p.push(c); } return p;
+                });
+                const gridStyle = computed(() => ({ gridTemplateColumns: `repeat(${layout.cols}, 1fr)`, gridTemplateRows: `repeat(${layout.rows}, 1fr)` }));
+                
+                const print = () => {
+                    const t = document.title;
+                    const now = new Date();
+                    document.title = `ShipMark_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+                    isPrinting.value = true;
+                    setTimeout(() => { window.print(); isPrinting.value = false; document.title = t; }, 200);
+                };
+
+                onMounted(() => lucide.createIcons());
+                return { layout, template, importData, paginatedData, gridStyle, isPrinting, primarySelection, selectedCells, primaryCell, handleCellClick, isPrimarySelected, isMultiSelected, notification, addRow, addColumnGlobally, resetRows, mergeSelectedCells, unmergeCells, deleteRow, deleteColumn, downloadTemplateCSV, handleImport, print, exportLayout, importLayout, getCellData };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
