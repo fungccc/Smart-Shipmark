@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧箱嘜 v13.1 (顯示修復版)</title>
+    <title>智慧箱嘜 v13.2 (文字介面修正版)</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
     <style>
-        /* 🖨️ 列印核心 (保持 v11 完美設定) */
+        /* 🖨️ 列印核心 (v11 完美版邏輯) */
         @media print {
             @page { margin: 0; size: A4; }
             html, body, #app, main {
@@ -69,9 +69,9 @@
             <div class="p-3 border-b bg-gray-50 flex justify-between items-center shrink-0">
                 <div>
                     <h1 class="text-lg font-bold text-blue-700 flex gap-2 items-center">
-                        <i data-lucide="printer-check"></i> 智慧箱嘜 v13.1
+                        <i data-lucide="printer-check"></i> 智慧箱嘜 v13.2
                     </h1>
-                    <p class="text-xs text-gray-500">介面修復 • 預覽增強</p>
+                    <p class="text-xs text-gray-500">v11核心 • 文字修正</p>
                 </div>
                 <div class="flex gap-1">
                     <button @click="exportLayout" class="flex flex-col items-center p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition" title="匯出設定"><i data-lucide="save" class="w-4 h-4"></i><span class="text-[10px]">匯出</span></button>
@@ -139,8 +139,8 @@
                         <button @click="changeType('static')" :class="primaryCell.type === 'static' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] border-r font-bold">文字</button>
                         <button @click="changeType('variable')" :class="primaryCell.type === 'variable' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] border-r font-bold">變數</button>
                         <button @click="changeType('barcode')" :class="primaryCell.type === 'barcode' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] border-r font-bold">條碼</button>
-                        <button @click="changeType('qrcode')" :class="primaryCell.type === 'qrcode' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] border-r font-bold">QR</button>
-                        <button @click="changeType('diamond')" :class="primaryCell.type === 'diamond' ? 'bg-yellow-500 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] font-bold">◆</button>
+                        <button @click="changeType('qrcode')" :class="primaryCell.type === 'qrcode' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] border-r font-bold">QR碼</button>
+                        <button @click="changeType('diamond')" :class="primaryCell.type === 'diamond' ? 'bg-yellow-500 text-white' : 'text-gray-600 hover:bg-gray-100'" class="py-1.5 text-[10px] font-bold">菱形</button>
                     </div>
 
                     <div class="mb-2">
@@ -333,8 +333,12 @@
                         primaryCell.value.value = primaryCell.value.value || '菱形文字';
                     }
                     if (type === 'barcode') {
+                        primaryCell.value.value = primaryCell.value.value || '12345678';
                         primaryCell.value.format = 'CODE128';
                         primaryCell.value.showValue = true;
+                    }
+                    if (type === 'qrcode') {
+                        primaryCell.value.value = primaryCell.value.value || 'https://example.com';
                     }
                 };
 
