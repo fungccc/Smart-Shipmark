@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧箱嘜 v13.2 (文字介面修正版)</title>
+    <title>智慧箱嘜 v13.3 (豐狂出品)</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
     <style>
-        /* 🖨️ 列印核心 (v11 完美版邏輯) */
+        /* 🖨️ 列印核心 (v11 完美版邏輯 - 嚴格保留) */
         @media print {
             @page { margin: 0; size: A4; }
             html, body, #app, main {
@@ -47,11 +47,13 @@
         }
         .selected-cell { outline: 2px dashed #f43f5e; z-index: 10; }
         .selected-primary { outline: 2px solid #3b82f6; z-index: 20; }
+        
         .footer-signature {
             position: fixed; bottom: 5px; left: 50%; transform: translateX(-50%);
             font-size: 10px; color: #9ca3af; pointer-events: none; z-index: 50;
             font-family: sans-serif; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
+        
         input[type="color"] { -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; overflow: hidden; border-radius: 4px; cursor: pointer; }
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: none; }
@@ -66,16 +68,18 @@
         </div>
 
         <aside class="w-[450px] bg-white shadow-2xl flex flex-col z-20 no-print border-r h-full overflow-hidden">
-            <div class="p-3 border-b bg-gray-50 flex justify-between items-center shrink-0">
-                <div>
-                    <h1 class="text-lg font-bold text-blue-700 flex gap-2 items-center">
-                        <i data-lucide="printer-check"></i> 智慧箱嘜 v13.2
-                    </h1>
-                    <p class="text-xs text-gray-500">v11核心 • 文字修正</p>
-                </div>
-                <div class="flex gap-1">
-                    <button @click="exportLayout" class="flex flex-col items-center p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition" title="匯出設定"><i data-lucide="save" class="w-4 h-4"></i><span class="text-[10px]">匯出</span></button>
-                    <label class="flex flex-col items-center p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition cursor-pointer" title="匯入設定"><input type="file" accept=".json" @change="importLayout" class="hidden"><i data-lucide="folder-open" class="w-4 h-4"></i><span class="text-[10px]">匯入</span></label>
+            <div class="p-4 border-b bg-gray-50 flex flex-col gap-2 shrink-0">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h1 class="text-xl font-bold text-blue-700 flex gap-2 items-center">
+                            <i data-lucide="printer-check"></i> 智慧箱嘜 v13.3
+                        </h1>
+                        <p class="text-sm text-gray-500 font-bold mt-1">豐狂出品 • 信心保證</p>
+                    </div>
+                    <div class="flex gap-1">
+                        <button @click="exportLayout" class="flex flex-col items-center p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition border border-transparent hover:border-blue-200" title="匯出設定"><i data-lucide="save" class="w-4 h-4"></i><span class="text-[10px]">匯出</span></button>
+                        <label class="flex flex-col items-center p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition cursor-pointer border border-transparent hover:border-green-200" title="匯入設定"><input type="file" accept=".json" @change="importLayout" class="hidden"><i data-lucide="folder-open" class="w-4 h-4"></i><span class="text-[10px]">匯入</span></label>
+                    </div>
                 </div>
             </div>
 
@@ -184,14 +188,14 @@
 
                     <div class="grid grid-cols-2 gap-2 mb-2">
                         <div class="bg-white rounded border p-1 flex justify-between">
-                            <button @click="primaryCell.alignH = 'left'" :class="primaryCell.alignH === 'left' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-left" class="w-3 h-3"></i></button>
-                            <button @click="primaryCell.alignH = 'center'" :class="primaryCell.alignH === 'center' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-center" class="w-3 h-3"></i></button>
-                            <button @click="primaryCell.alignH = 'right'" :class="primaryCell.alignH === 'right' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-right" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignH = 'left'" :class="primaryCell.alignH === 'left' ? 'bg-gray-200' : ''" class="p-1 rounded hover:bg-gray-100"><i data-lucide="align-left" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignH = 'center'" :class="primaryCell.alignH === 'center' ? 'bg-gray-200' : ''" class="p-1 rounded hover:bg-gray-100"><i data-lucide="align-center" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignH = 'right'" :class="primaryCell.alignH === 'right' ? 'bg-gray-200' : ''" class="p-1 rounded hover:bg-gray-100"><i data-lucide="align-right" class="w-3 h-3"></i></button>
                         </div>
                         <div class="bg-white rounded border p-1 flex justify-between">
-                            <button @click="primaryCell.alignV = 'top'" :class="primaryCell.alignV === 'top' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-vertical-justify-start" class="w-3 h-3"></i></button>
-                            <button @click="primaryCell.alignV = 'middle'" :class="primaryCell.alignV === 'middle' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-vertical-justify-center" class="w-3 h-3"></i></button>
-                            <button @click="primaryCell.alignV = 'bottom'" :class="primaryCell.alignV === 'bottom' ? 'bg-gray-200' : ''" class="p-1 rounded"><i data-lucide="align-vertical-justify-end" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignV = 'top'" :class="primaryCell.alignV === 'top' ? 'bg-gray-200' : ''" class="p-1 rounded hover:bg-gray-100"><i data-lucide="align-vertical-justify-start" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignV = 'middle'" :class="primaryCell.alignV === 'middle' ? 'bg-gray-200' : ''" class="p-1 rounded hover:bg-gray-100"><i data-lucide="align-vertical-justify-center" class="w-3 h-3"></i></button>
+                            <button @click="primaryCell.alignV = 'bottom'" :class="primaryCell.alignV === 'bottom' ? 'bg-gray-200' : ''" class="p-1 rounded hover:bg-gray-100"><i data-lucide="align-vertical-justify-end" class="w-3 h-3"></i></button>
                         </div>
                     </div>
 
@@ -236,14 +240,14 @@
                                  :class="{ 'selected-primary': !isPrinting && !item.isPlaceholder && isPrimarySelected(rIdx, cIdx), 'selected-cell': !isPrinting && !item.isPlaceholder && isMultiSelected(rIdx, cIdx), 'font-bold': cell.isBold, 'italic': cell.isItalic, 'underline': cell.isUnderline, 'border-t': cell.borders.top, 'border-b': cell.borders.bottom, 'border-l': cell.borders.left, 'border-r': cell.borders.right }"
                                  :style="{ color: cell.color, backgroundColor: cell.bgColor, borderColor: cell.color !== '#000000' && cell.color !== '#ffffff' ? cell.color : '', flexGrow: cell.colSpan || 1, flexBasis: 0, justifyContent: cell.alignH === 'left' ? 'flex-start' : (cell.alignH === 'right' ? 'flex-end' : 'center'), alignItems: cell.alignV === 'top' ? 'flex-start' : (cell.alignV === 'bottom' ? 'flex-end' : 'center'), textAlign: cell.alignH, fontSize: (cell.fontSize || 12) + 'px' }">
                                 
-                                <div v-if="cell.type === 'diamond' && !item.isPlaceholder" class="flex items-center justify-center relative" :style="{ width: (cell.diamondW || 70) + 'px', height: (cell.diamondH || 70) + 'px' }">
+                                <div v-if="cell.type === 'diamond'" class="flex items-center justify-center relative" :style="{ width: (cell.diamondW || 70) + 'px', height: (cell.diamondH || 70) + 'px' }">
                                     <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" class="absolute inset-0"><polygon points="50,0 100,50 50,100 0,50" fill="none" :stroke="cell.color" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
                                     <div class="relative z-10 text-center leading-tight break-words px-1" :style="{ color: cell.color }">{{ cell.value || '' }}</div>
                                 </div>
 
-                                <barcode-item v-else-if="cell.type === 'barcode' && !item.isPlaceholder" :text="getCellData(cell, item)" :format="cell.format || 'CODE128'" :show-value="cell.showValue !== false" :color="cell.color"></barcode-item>
+                                <barcode-item v-else-if="cell.type === 'barcode'" :text="getCellData(cell, item)" :format="cell.format || 'CODE128'" :show-value="cell.showValue !== false" :color="cell.color"></barcode-item>
 
-                                <qrcode-item v-else-if="cell.type === 'qrcode' && !item.isPlaceholder" :text="getCellData(cell, item)" :color="cell.color"></qrcode-item>
+                                <qrcode-item v-else-if="cell.type === 'qrcode'" :text="getCellData(cell, item)" :color="cell.color"></qrcode-item>
 
                                 <span v-else-if="cell.type === 'static'">{{ cell.value }}</span>
                                 <span v-else class="whitespace-pre-wrap">{{ !item.isPlaceholder && importData.length > 0 ? (item[cell.key] || '') : (item.isPlaceholder ? '' : `[${cell.key}]`) }}</span>
@@ -267,7 +271,7 @@
                 const render = () => {
                     if (svgRef.value && props.text) {
                         try {
-                            // 預覽模式時，若是空字串，給假資料避免報錯
+                            // 防呆：如果是空的，給預覽值
                             const data = props.text === '' ? '123456' : props.text;
                             JsBarcode(svgRef.value, data, {
                                 format: props.format, displayValue: props.showValue, lineColor: props.color || '#000', margin: 0, height: 40, width: 2, fontSize: 12
@@ -287,7 +291,8 @@
             setup(props) {
                 const src = ref('');
                 const render = async () => {
-                    const data = props.text === '' ? 'PREVIEW' : props.text;
+                    // 防呆
+                    const data = props.text === '' ? 'https://example.com' : props.text;
                     if (data) {
                         try {
                             src.value = await QRCode.toDataURL(data, { margin: 0, color: { dark: props.color || '#000', light: '#0000' } });
@@ -322,14 +327,13 @@
 
                 const createCell = () => ({ type: 'static', value: 'New', key: '', isBold: false, bgColor: '#ffffff', color: '#000000', diamondW: 70, diamondH: 70, colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true }, format: 'CODE128', showValue: true, isVariable: false });
                 
-                // 修復切換類型時的預設值邏輯
                 const changeType = (type) => {
                     if (!primaryCell.value) return;
                     primaryCell.value.type = type;
-                    // 初始化特定類型參數
+                    // 初始化參數，確保切換後馬上能看到東西
                     if (type === 'diamond') {
-                        if (!primaryCell.value.diamondW) primaryCell.value.diamondW = 100;
-                        if (!primaryCell.value.diamondH) primaryCell.value.diamondH = 100;
+                        primaryCell.value.diamondW = primaryCell.value.diamondW || 100;
+                        primaryCell.value.diamondH = primaryCell.value.diamondH || 100;
                         primaryCell.value.value = primaryCell.value.value || '菱形文字';
                     }
                     if (type === 'barcode') {
@@ -387,11 +391,12 @@
                 const handleImport = (e) => { const f = e.target.files[0]; if (!f) return; Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => { importData.value = res.data; e.target.value = ''; showNotification(`上載成功：${res.data.length} 筆資料`); } }); };
 
                 const getCellData = (cell, item) => {
-                    // 如果有數據，且不是補白 -> 顯示真實資料
                     if (importData.value.length > 0 && !item.isPlaceholder) {
                         return cell.isVariable ? (item[cell.key] || '') : (cell.value || '');
                     }
-                    // 如果是設計模式或補白 -> 顯示預覽
+                    // 強制預覽 (Fix)
+                    if (cell.type === 'barcode') return cell.value || '12345678';
+                    if (cell.type === 'qrcode') return cell.value || 'https://example.com';
                     if (cell.isVariable) return 'PREVIEW';
                     return cell.value || '12345678';
                 };
