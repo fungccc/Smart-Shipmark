@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧箱嘜 v13.3 (豐狂出品)</title>
+    <title>智慧箱嘜 v14.1 (豐狂出品)</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
@@ -39,7 +39,8 @@
             padding: 10mm; margin: 0 auto 30px auto; 
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); display: grid; gap: 4mm;
         }
-        .ship-mark-card { border: 2px solid #000; display: flex; flex-direction: column; height: 100%; background: white; overflow: hidden; }
+        /* 修改: 移除 CSS 中的強制 border，改由 Vue 控制 */
+        .ship-mark-card { display: flex; flex-direction: column; height: 100%; background: white; overflow: hidden; }
         .mark-row { display: flex; width: 100%; position: relative; }
         .mark-cell { 
             padding: 4px; display: flex; word-break: break-word; min-height: 28px;
@@ -54,7 +55,8 @@
             font-family: sans-serif; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
         
-        input[type="color"] { -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; overflow: hidden; border-radius: 4px; cursor: pointer; }
+        /* 修改: 增加 border 屬性，確保白色背景下可見 */
+        input[type="color"] { -webkit-appearance: none; border: 1px solid #d1d5db; width: 24px; height: 24px; padding: 0; overflow: hidden; border-radius: 4px; cursor: pointer; }
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: none; }
     </style>
@@ -67,20 +69,33 @@
             {{ notification.message }}
         </div>
 
-        <aside class="w-[450px] bg-white shadow-2xl flex flex-col z-20 no-print border-r h-full overflow-hidden">
-            <div class="p-4 border-b bg-gray-50 flex flex-col gap-2 shrink-0">
+        <aside class="w-[450px] bg-blue-200 shadow-2xl flex flex-col z-20 no-print border-r h-full overflow-hidden">
+            <div class="p-4 border-b bg-blue-200 flex flex-col gap-2 shrink-0">
                 <div class="flex justify-between items-start">
                     <div>
                         <h1 class="text-xl font-bold text-blue-700 flex gap-2 items-center">
-                            <i data-lucide="printer-check"></i> 智慧箱嘜 v13.3
+                            <i data-lucide="printer-check"></i> 智慧箱嘜 v14.1
                         </h1>
                         <p class="text-sm text-gray-500 font-bold mt-1">豐狂出品 • 信心保證</p>
                     </div>
-                    <div class="flex gap-1">
-                        <button @click="exportLayout" class="flex flex-col items-center p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition border border-transparent hover:border-blue-200" title="匯出設定"><i data-lucide="save" class="w-4 h-4"></i><span class="text-[10px]">匯出</span></button>
-                        <label class="flex flex-col items-center p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition cursor-pointer border border-transparent hover:border-green-200" title="匯入設定"><input type="file" accept=".json" @change="importLayout" class="hidden"><i data-lucide="folder-open" class="w-4 h-4"></i><span class="text-[10px]">匯入</span></label>
+                    <div class="flex flex-col gap-2 items-end">
+                        <div class="flex gap-1">
+                            <button @click="exportLayout" class="flex flex-col items-center p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition border border-transparent hover:border-blue-200" title="匯出設定">
+                                <i data-lucide="save" class="w-4 h-4"></i>
+                                <span class="text-[10px]">匯出箱嘜模具</span>
+                            </button>
+                            <label class="flex flex-col items-center p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition cursor-pointer border border-transparent hover:border-green-200" title="匯入設定">
+                                <input type="file" accept=".json" @change="importLayout" class="hidden">
+                                <i data-lucide="folder-open" class="w-4 h-4"></i>
+                                <span class="text-[10px]">匯入箱嘜模具</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
+                <select @change="loadDemoTemplate" class="text-xs border border-gray-300 rounded p-1 w-full bg-white hover:border-blue-400 focus:outline-none focus:border-blue-500 transition-colors">
+                    <option value="">-- 載入官方範本 (自動匯入) --</option>
+                    <option v-for="n in 10" :key="n" :value="n">DEMO{{ String(n).padStart(2, '0') }}</option>
+                </select>
             </div>
 
             <div class="flex-1 overflow-y-auto p-4 space-y-5">
@@ -102,6 +117,9 @@
                 <section>
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">2. 表格結構 (Ctrl 多選)</h3>
+                        <label class="flex items-center gap-1 text-xs text-gray-700 cursor-pointer select-none bg-gray-50 px-2 py-0.5 rounded border hover:bg-gray-100">
+                            <input type="checkbox" v-model="template.hasOuterBorder"> 最外框架
+                        </label>
                     </div>
                     <div class="grid grid-cols-4 gap-1 mb-2">
                         <button @click="resetRows" class="text-xs border border-red-200 text-red-500 hover:bg-red-50 px-2 py-1 rounded">重置</button>
@@ -175,8 +193,8 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-2 mb-2 bg-white p-2 rounded border">
-                        <div class="flex items-center gap-2"><label class="text-[10px] font-bold text-gray-500">前景色</label><input type="color" v-model="primaryCell.color" class="w-6 h-6 p-0 border-0 rounded cursor-pointer"></div>
-                        <div class="flex items-center gap-2"><label class="text-[10px] font-bold text-gray-500">背景色</label><input type="color" v-model="primaryCell.bgColor" class="w-6 h-6 p-0 border-0 rounded cursor-pointer"></div>
+                        <div class="flex items-center gap-2"><label class="text-[10px] font-bold text-gray-500">前景色</label><input type="color" v-model="primaryCell.color" class="w-6 h-6 p-0 border border-gray-300 rounded cursor-pointer"></div>
+                        <div class="flex items-center gap-2"><label class="text-[10px] font-bold text-gray-500">背景色</label><input type="color" v-model="primaryCell.bgColor" class="w-6 h-6 p-0 border border-gray-300 rounded cursor-pointer"></div>
                     </div>
 
                     <div v-if="primaryCell.type === 'diamond'" class="mb-2 bg-yellow-50 p-2 rounded border border-yellow-200">
@@ -209,7 +227,7 @@
                     <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded border justify-items-center w-24 mx-auto">
                         <div class="col-start-2"><input type="checkbox" v-model="primaryCell.borders.top" title="上邊框"></div>
                         <div class="col-start-1 row-start-2"><input type="checkbox" v-model="primaryCell.borders.left" title="左邊框"></div>
-                        <div class="col-start-2 row-start-2 w-3 h-3 bg-gray-100 border flex items-center justify-center text-[8px] text-gray-400">線</div>
+                        <div class="col-start-2 row-start-2 w-3 h-3 bg-gray-100 border flex items-center justify-center text-[16px] text-black">線</div>
                         <div class="col-start-3 row-start-2"><input type="checkbox" v-model="primaryCell.borders.right" title="右邊框"></div>
                         <div class="col-start-2 row-start-3"><input type="checkbox" v-model="primaryCell.borders.bottom" title="下邊框"></div>
                     </div>
@@ -233,7 +251,7 @@
             <div v-if="!importData.length" class="no-print mb-4 flex justify-center"><div class="bg-yellow-500 text-white px-4 py-1 rounded-full text-sm shadow animate-pulse">設計模式 (顯示預設值)</div></div>
 
             <div v-for="(pageItems, pIdx) in paginatedData" :key="pIdx" class="print-page" :style="gridStyle">
-                <div v-for="(item, iIdx) in pageItems" :key="iIdx" class="ship-mark-card" :class="{'opacity-0 border-0': item.isPlaceholder && false}">
+                <div v-for="(item, iIdx) in pageItems" :key="iIdx" class="ship-mark-card" :class="{'border-2 border-black': template.hasOuterBorder !== false, 'opacity-0 border-0': item.isPlaceholder && false}">
                     <div class="flex-1 flex flex-col w-full">
                         <div v-for="(row, rIdx) in template.rows" :key="rIdx" class="mark-row">
                             <div v-for="(cell, cIdx) in row.cells" :key="cIdx" class="mark-cell bg-force"
@@ -315,7 +333,11 @@
                 const primarySelection = reactive({ row: -1, col: -1 });
                 const selectedCells = ref([]); 
 
-                const template = reactive({ rows: [ { cells: [{ type: 'static', value: 'SHIPPING MARK', key: '', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 2, fontSize: 20, alignH: 'center', alignV: 'middle', borders: { top: false, bottom: false, left: false, right: false } }] }, { cells: [{ type: 'diamond', value: '豐狂出品', key: '', isBold: false, bgColor: '#ffffff', color: '#000000', diamondW: 100, diamondH: 100, colSpan: 2, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: false, bottom: false, left: false, right: false } }] }, { cells: [{ type: 'static', value: 'PO NO.:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'PO', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'STYLE NO.:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'STYLE', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'COLOR:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'COLOR', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'QTY:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'QTY', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'C/NO:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'C/NO', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'N.W:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'N.W', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'G.W:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'G.W', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'MEAS:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'MEAS', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'MADE IN HONG KONG', key: '', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 2, fontSize: 14, alignH: 'center', alignV: 'bottom', borders: { top: false, bottom: false, left: false, right: false } }] }] });
+                // 初始化 template，加入 hasOuterBorder 預設為 true
+                const template = reactive({ 
+                    hasOuterBorder: true,
+                    rows: [ { cells: [{ type: 'static', value: 'SHIPPING MARK', key: '', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 2, fontSize: 20, alignH: 'center', alignV: 'middle', borders: { top: false, bottom: false, left: false, right: false } }] }, { cells: [{ type: 'diamond', value: '4890008100309', key: '', isBold: false, bgColor: '#ffffff', color: '#000000', diamondW: 100, diamondH: 100, colSpan: 2, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: false, bottom: false, left: false, right: false } }] }, { cells: [{ type: 'static', value: 'PO NO.:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'PO', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'STYLE NO.:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'STYLE', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'COLOR:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'COLOR', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'QTY:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'QTY', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'C/NO:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'C/NO', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'N.W:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'N.W', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'G.W:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'G.W', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'MEAS:', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'left', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }, { type: 'variable', value: '', key: 'MEAS', isBold: false, bgColor: '#ffffff', color: '#000000', colSpan: 1, fontSize: 12, alignH: 'center', alignV: 'middle', borders: { top: true, bottom: true, left: true, right: true } }] }, { cells: [{ type: 'static', value: 'MADE IN HONG KONG', key: '', isBold: true, bgColor: '#ffffff', color: '#000000', colSpan: 2, fontSize: 14, alignH: 'center', alignV: 'bottom', borders: { top: false, bottom: false, left: false, right: false } }] }] 
+                });
 
                 const showNotification = (msg, type = 'success') => { notification.message = msg; notification.type = type; notification.show = true; setTimeout(() => notification.show = false, 3000); };
                 const handleCellClick = (r, c, event) => {
@@ -330,7 +352,6 @@
                 const changeType = (type) => {
                     if (!primaryCell.value) return;
                     primaryCell.value.type = type;
-                    // 初始化參數，確保切換後馬上能看到東西
                     if (type === 'diamond') {
                         primaryCell.value.diamondW = primaryCell.value.diamondW || 100;
                         primaryCell.value.diamondH = primaryCell.value.diamondH || 100;
@@ -383,6 +404,37 @@
 
                 const exportLayout = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ layout, template })], { type: 'application/json' })); a.download = `ShipMark_Template_${new Date().toISOString().slice(0,10)}.json`; a.click(); };
                 const importLayout = (e) => { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = (evt) => { const d = JSON.parse(evt.target.result); if(d.layout) Object.assign(layout, d.layout); if(d.template) Object.assign(template, d.template); showNotification('模具匯入成功'); }; r.readAsText(f); e.target.value = ''; };
+                
+                // 新增: 載入線上 DEMO 範本
+                const loadDemoTemplate = async (e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const num = String(val).padStart(2, '0');
+                    const url = `https://fungccc.github.io/Smart-Shipmark/shipmark_DEMO_${num}.json`;
+                    
+                    showNotification(`正在載入 DEMO${num}...`);
+                    
+                    try {
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                        const d = await res.json();
+                        
+                        if(d.layout) Object.assign(layout, d.layout);
+                        // 確保匯入的 template 也包含 hasOuterBorder 屬性 (如果舊版 JSON 沒有，預設為 true)
+                        if(d.template) {
+                            if (d.template.hasOuterBorder === undefined) d.template.hasOuterBorder = true;
+                            Object.assign(template, d.template);
+                        }
+                        
+                        showNotification(`DEMO${num} 載入成功`);
+                    } catch (err) {
+                        console.error(err);
+                        showNotification(`載入失敗: ${err.message}`, 'error');
+                    } finally {
+                        e.target.value = ''; // 重置下拉選單
+                    }
+                };
+
                 const downloadTemplateCSV = () => { 
                     const keys = new Set(); template.rows.forEach(r => r.cells.forEach(c => { if ((c.type === 'variable' || (c.isVariable && (c.type === 'barcode' || c.type === 'qrcode'))) && c.key) keys.add(c.key); }));
                     const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -394,7 +446,6 @@
                     if (importData.value.length > 0 && !item.isPlaceholder) {
                         return cell.isVariable ? (item[cell.key] || '') : (cell.value || '');
                     }
-                    // 強制預覽 (Fix)
                     if (cell.type === 'barcode') return cell.value || '12345678';
                     if (cell.type === 'qrcode') return cell.value || 'https://example.com';
                     if (cell.isVariable) return 'PREVIEW';
@@ -416,7 +467,6 @@
                     setTimeout(() => { window.print(); isPrinting.value = false; document.title = t; }, 200);
                 };
 
-                // Watch Editor Open to refresh icons
                 watch(primaryCell, () => {
                     nextTick(() => lucide.createIcons());
                 });
@@ -427,7 +477,7 @@
                     layout, template, importData, paginatedData, gridStyle, isPrinting, 
                     primarySelection, selectedCells, primaryCell, handleCellClick, isPrimarySelected, isMultiSelected, notification,
                     addRow, addColumnGlobally, resetRows, mergeSelectedCells, unmergeCells, deleteRow, deleteColumn,
-                    downloadTemplateCSV, handleImport, print, exportLayout, importLayout, getCellData, changeType
+                    downloadTemplateCSV, handleImport, print, exportLayout, importLayout, getCellData, changeType, loadDemoTemplate
                 };
             }
         }).mount('#app');
